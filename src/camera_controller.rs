@@ -55,10 +55,9 @@ impl CameraController {
     }
 
     pub fn update_camera(&self, camera: &mut Camera) {
-        use cgmath::InnerSpace;
         let forward = camera.target - camera.eye;
         let forward_norm = forward.normalize();
-        let forward_mag = forward.magnitude();
+        let forward_mag = forward.length();
 
         // Prevents glitching when the camera gets too close to the
         // center of the scene.
@@ -73,7 +72,7 @@ impl CameraController {
 
         // Redo radius calc in case the forward/backward is pressed.
         let forward = camera.target - camera.eye;
-        let forward_mag = forward.magnitude();
+        let forward_mag = forward.length();
 
         if self.is_right_pressed {
             // Rescale the distance between the target and the eye so
