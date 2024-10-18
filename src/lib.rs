@@ -1,3 +1,5 @@
+mod camera;
+mod camera_controller;
 mod state;
 
 use state::State;
@@ -25,6 +27,7 @@ pub async fn run() {
                 window_id: _,
             } = event
             {
+                state.input(event);
                 match event {
                     WindowEvent::CloseRequested
                     | WindowEvent::KeyboardInput {
