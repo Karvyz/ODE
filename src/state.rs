@@ -1,10 +1,11 @@
 use std::iter;
-use wgpu::{util::DeviceExt, Device};
+use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 use crate::{
     camera::{Camera, CameraUniform},
     camera_controller::CameraController,
+    object::{Object, ObjectRaw},
 };
 
 pub struct State<'a> {
@@ -13,12 +14,14 @@ pub struct State<'a> {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
-    render_pipeline: wgpu::RenderPipeline,
     camera: Camera,
     camera_controller: CameraController,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    bodies: Vec<Object>,
+    bodies_buffer: wgpu::Buffer,
+    render_pipeline: wgpu::RenderPipeline,
     // The window must be declared after the surface so
     // it gets dropped after it as the surface contains
     // unsafe references to the window's resources.
@@ -113,6 +116,24 @@ impl<'a> State<'a> {
             label: Some("camera_bind_group"),
         });
 
+        let bodies = vec![
+            Object::builder()
+                .position(glam::Vec3::new(0.0, 0.0, 0.0))
+                .rotation(glam::Quat::IDENTITY)
+                .build(),
+            Object::builder()
+                .position(glam::Vec3::new(0.0, 0.0, -2.0))
+                .rotation(glam::Quat::IDENTITY)
+                .build(),
+        ];
+
+        let instance_data = bodies.iter().map(Object::to_raw).collect::<Vec<_>>();
+        let bodies_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
         let bind_groups = [&camera_bind_group_layout];
         let render_pipeline = Self::pipeline(&device, &bind_groups, &config);
 
@@ -122,12 +143,14 @@ impl<'a> State<'a> {
             queue,
             config,
             size,
-            render_pipeline,
             camera,
             camera_controller: CameraController::new(0.2),
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            bodies,
+            bodies_buffer,
+            render_pipeline,
             window,
         }
     }
@@ -192,7 +215,9 @@ impl<'a> State<'a> {
             });
             render_pass.set_pipeline(&self.render_pipeline); // 2.
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            render_pass.draw(0..3, 0..1); // 3
+            render_pass.set_vertex_buffer(0, self.bodies_buffer.slice(..));
+            render_pass.draw(0..3, 0..self.bodies.len() as _);
+            // render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
         }
 
         self.queue.submit(iter::once(encoder.finish()));
@@ -202,7 +227,7 @@ impl<'a> State<'a> {
     }
 
     fn pipeline(
-        device: &Device,
+        device: &wgpu::Device,
         bind_groups: &[&wgpu::BindGroupLayout],
         config: &wgpu::SurfaceConfiguration,
     ) -> wgpu::RenderPipeline {
@@ -218,8 +243,8 @@ impl<'a> State<'a> {
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: "vs_main", // 1.
-                buffers: &[],           // 2.
+                entry_point: "vs_main",        // 1.
+                buffers: &[ObjectRaw::desc()], // 2.
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {

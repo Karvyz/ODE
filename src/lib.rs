@@ -1,5 +1,6 @@
 mod camera;
 mod camera_controller;
+mod object;
 mod state;
 
 use state::State;
