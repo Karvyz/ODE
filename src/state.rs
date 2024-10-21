@@ -1,11 +1,15 @@
-use std::iter;
+use std::{
+    iter,
+    sync::{Arc, Mutex},
+};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 use crate::{
     camera::{Camera, CameraUniform},
     camera_controller::CameraController,
-    object::{Object, ObjectRaw},
+    instance::{Instance, InstanceRaw},
+    object::Object,
 };
 
 pub struct State<'a> {
@@ -19,8 +23,9 @@ pub struct State<'a> {
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
-    bodies: Vec<Object>,
-    bodies_buffer: wgpu::Buffer,
+    objects: Arc<Mutex<Vec<Object>>>,
+    instances: Vec<Instance>,
+    instances_buffer: wgpu::Buffer,
     render_pipeline: wgpu::RenderPipeline,
     // The window must be declared after the surface so
     // it gets dropped after it as the surface contains
@@ -29,7 +34,7 @@ pub struct State<'a> {
 }
 
 impl<'a> State<'a> {
-    pub async fn new(window: &'a Window) -> State<'a> {
+    pub async fn new(window: &'a Window, objects: Arc<Mutex<Vec<Object>>>) -> State<'a> {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -116,19 +121,10 @@ impl<'a> State<'a> {
             label: Some("camera_bind_group"),
         });
 
-        let bodies = vec![
-            Object::builder()
-                .position(glam::Vec3::new(0.0, 0.0, 0.0))
-                .rotation(glam::Quat::IDENTITY)
-                .build(),
-            Object::builder()
-                .position(glam::Vec3::new(0.0, 0.0, -2.0))
-                .rotation(glam::Quat::IDENTITY)
-                .build(),
-        ];
+        let instances = vec![];
+        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
 
-        let instance_data = bodies.iter().map(Object::to_raw).collect::<Vec<_>>();
-        let bodies_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let instances_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
             contents: bytemuck::cast_slice(&instance_data),
             usage: wgpu::BufferUsages::VERTEX,
@@ -148,8 +144,9 @@ impl<'a> State<'a> {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
-            bodies,
-            bodies_buffer,
+            objects,
+            instances,
+            instances_buffer,
             render_pipeline,
             window,
         }
@@ -180,6 +177,24 @@ impl<'a> State<'a> {
             0,
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
+        if let Ok(objects) = self.objects.try_lock() {
+            self.instances = objects
+                .iter()
+                .map(|o| Instance::new(o.position, glam::Quat::IDENTITY))
+                .collect();
+            let instance_data = self
+                .instances
+                .iter()
+                .map(Instance::to_raw)
+                .collect::<Vec<_>>();
+            self.instances_buffer =
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Instance Buffer"),
+                        contents: bytemuck::cast_slice(&instance_data),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
+        }
     }
 
     pub fn input(&mut self, event: &winit::event::WindowEvent) {
@@ -215,8 +230,8 @@ impl<'a> State<'a> {
             });
             render_pass.set_pipeline(&self.render_pipeline); // 2.
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.bodies_buffer.slice(..));
-            render_pass.draw(0..3, 0..self.bodies.len() as _);
+            render_pass.set_vertex_buffer(0, self.instances_buffer.slice(..));
+            render_pass.draw(0..3, 0..self.instances.len() as _);
             // render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
         }
 
@@ -243,8 +258,8 @@ impl<'a> State<'a> {
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: "vs_main",        // 1.
-                buffers: &[ObjectRaw::desc()], // 2.
+                entry_point: "vs_main",          // 1.
+                buffers: &[InstanceRaw::desc()], // 2.
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {

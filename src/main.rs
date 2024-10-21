@@ -1,3 +1,21 @@
+use std::{thread::sleep, time::Duration};
+
+use glam::Vec3;
+use ode::object::Object;
+
 fn main() {
-    pollster::block_on(ode::run());
+    let objects = ode::run();
+    for i in 0..10 {
+        for j in 0..10 {
+            for k in 0..10 {
+                objects
+                    .lock()
+                    .unwrap()
+                    .push(Object::new(Vec3::new(i as f32, j as f32, k as f32)));
+            }
+        }
+    }
+    loop {
+        sleep(Duration::from_secs(1));
+    }
 }
