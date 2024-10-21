@@ -1,15 +1,12 @@
-use std::{
-    iter,
-    sync::{Arc, Mutex},
-};
+use std::iter;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 use crate::{
+    bridge::Bridge,
     camera::{Camera, CameraUniform},
     camera_controller::CameraController,
     instance::{Instance, InstanceRaw},
-    object::Object,
 };
 
 pub struct State<'a> {
@@ -23,7 +20,7 @@ pub struct State<'a> {
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
-    objects: Arc<Mutex<Vec<Object>>>,
+    bridge: Bridge,
     instances: Vec<Instance>,
     instances_buffer: wgpu::Buffer,
     render_pipeline: wgpu::RenderPipeline,
@@ -34,7 +31,7 @@ pub struct State<'a> {
 }
 
 impl<'a> State<'a> {
-    pub async fn new(window: &'a Window, objects: Arc<Mutex<Vec<Object>>>) -> State<'a> {
+    pub async fn new(window: &'a Window, bridge: Bridge) -> State<'a> {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -144,7 +141,7 @@ impl<'a> State<'a> {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
-            objects,
+            bridge,
             instances,
             instances_buffer,
             render_pipeline,
@@ -177,7 +174,7 @@ impl<'a> State<'a> {
             0,
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
-        if let Ok(objects) = self.objects.try_lock() {
+        if let Some(objects) = self.bridge.try_get_objects_mut() {
             self.instances = objects
                 .iter()
                 .map(|o| Instance::new(o.position, glam::Quat::IDENTITY))
@@ -239,6 +236,10 @@ impl<'a> State<'a> {
         output.present();
 
         Ok(())
+    }
+
+    pub fn kill(&self) {
+        self.bridge.set_window_killed(true);
     }
 
     fn pipeline(

@@ -1,15 +1,13 @@
+pub mod bridge;
 mod camera;
 mod camera_controller;
 mod instance;
 pub mod object;
 mod state;
 
-use object::Object;
+use bridge::Bridge;
 use state::State;
-use std::{
-    sync::{Arc, Mutex},
-    thread::{self},
-};
+use std::thread::{self};
 use winit::{
     event::*,
     event_loop::EventLoopBuilder,
@@ -18,10 +16,11 @@ use winit::{
     window::WindowBuilder,
 };
 
-pub fn run() -> Arc<Mutex<Vec<Object>>> {
+pub fn run() -> Bridge {
     env_logger::init();
-    let ext_objects = Arc::new(Mutex::new(vec![]));
-    let int_objects = Arc::clone(&ext_objects);
+
+    let ext_bridge = Bridge::default();
+    let int_bridge = ext_bridge.clone();
 
     thread::spawn(|| {
         let event_loop = EventLoopBuilder::new()
@@ -29,7 +28,7 @@ pub fn run() -> Arc<Mutex<Vec<Object>>> {
             .build()
             .unwrap();
         let window = WindowBuilder::new().build(&event_loop).unwrap();
-        let mut state = pollster::block_on(State::new(&window, int_objects));
+        let mut state = pollster::block_on(State::new(&window, int_bridge));
         let mut surface_configured = false;
         event_loop
             .run(move |event, control_flow| {
@@ -49,7 +48,10 @@ pub fn run() -> Arc<Mutex<Vec<Object>>> {
                                     ..
                                 },
                             ..
-                        } => control_flow.exit(),
+                        } => {
+                            control_flow.exit();
+                            state.kill();
+                        }
                         WindowEvent::Resized(physical_size) => {
                             log::info!("physical_size: {physical_size:?}");
                             surface_configured = true;
@@ -88,5 +90,5 @@ pub fn run() -> Arc<Mutex<Vec<Object>>> {
             })
             .unwrap();
     });
-    ext_objects
+    ext_bridge
 }

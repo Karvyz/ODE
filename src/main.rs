@@ -4,18 +4,21 @@ use glam::Vec3;
 use ode::object::Object;
 
 fn main() {
-    let objects = ode::run();
-    for i in 0..10 {
-        for j in 0..10 {
-            for k in 0..10 {
-                objects
-                    .lock()
-                    .unwrap()
-                    .push(Object::new(Vec3::new(i as f32, j as f32, k as f32)));
+    let bridge = ode::run();
+    {
+        let mut objects = bridge.get_objects_mut();
+        for i in 0..10 {
+            for j in 0..10 {
+                for k in 0..10 {
+                    objects.push(Object::new(Vec3::new(i as f32, j as f32, k as f32)));
+                }
             }
         }
     }
     loop {
         sleep(Duration::from_secs(1));
+        if bridge.window_killed() {
+            break;
+        }
     }
 }
