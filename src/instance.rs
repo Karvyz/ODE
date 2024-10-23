@@ -17,6 +17,10 @@ impl Instance {
             .to_cols_array_2d(),
         }
     }
+
+    pub fn distance_squared(&self, pos: &Vec3) -> f32 {
+        pos.distance_squared(self.position)
+    }
 }
 
 #[repr(C)]

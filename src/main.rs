@@ -7,9 +7,9 @@ fn main() {
     let bridge = ode::run();
     {
         let mut objects = bridge.get_objects_mut();
-        for i in 0..10 {
-            for j in 0..10 {
-                for k in 0..10 {
+        for i in 0..100 {
+            for j in 0..100 {
+                for k in 0..100 {
                     objects.push(Object::new(Vec3::new(i as f32, j as f32, k as f32)));
                 }
             }

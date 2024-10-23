@@ -1,4 +1,4 @@
-use std::iter;
+use std::{iter, time::Instant};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
@@ -28,6 +28,9 @@ pub struct State<'a> {
     // it gets dropped after it as the surface contains
     // unsafe references to the window's resources.
     window: &'a Window,
+
+    nb_frames: u32,
+    prev_sec: Instant,
 }
 
 impl<'a> State<'a> {
@@ -146,6 +149,8 @@ impl<'a> State<'a> {
             instances_buffer,
             render_pipeline,
             window,
+            nb_frames: 0,
+            prev_sec: Instant::now(),
         }
     }
 
@@ -179,6 +184,14 @@ impl<'a> State<'a> {
                 .iter()
                 .map(|o| Instance::new(o.position, glam::Quat::IDENTITY))
                 .collect();
+            self.instances.sort_by(|a, b| {
+                let dist_a = a.distance_squared(&self.camera.eye);
+                let dist_b = b.distance_squared(&self.camera.eye);
+                dist_b
+                    .partial_cmp(&dist_a)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
             let instance_data = self
                 .instances
                 .iter()
@@ -191,6 +204,13 @@ impl<'a> State<'a> {
                         contents: bytemuck::cast_slice(&instance_data),
                         usage: wgpu::BufferUsages::VERTEX,
                     });
+        }
+
+        self.nb_frames += 1;
+        if self.prev_sec.elapsed().as_secs() >= 1 {
+            println!("FPS: {}", self.nb_frames);
+            self.nb_frames = 0;
+            self.prev_sec = Instant::now();
         }
     }
 
