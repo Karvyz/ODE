@@ -1,15 +1,11 @@
 use glam::{Quat, Vec3};
 
 pub struct Instance {
-    position: Vec3,
+    pub position: Vec3,
     rotation: Quat,
 }
 
 impl Instance {
-    pub fn new(position: Vec3, rotation: Quat) -> Self {
-        Self { position, rotation }
-    }
-
     pub fn to_raw(&self) -> InstanceRaw {
         InstanceRaw {
             model: (glam::Mat4::from_translation(self.position)
@@ -18,8 +14,11 @@ impl Instance {
         }
     }
 
-    pub fn distance_squared(&self, pos: &Vec3) -> f32 {
-        pos.distance_squared(self.position)
+    pub fn new_raw(position: Vec3, rotation: Quat) -> InstanceRaw {
+        InstanceRaw {
+            model: (glam::Mat4::from_translation(position) * glam::Mat4::from_quat(rotation))
+                .to_cols_array_2d(),
+        }
     }
 }
 

@@ -22,7 +22,7 @@ pub struct State<'a> {
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     bridge: Bridge,
-    instances: Vec<Instance>,
+    instances_data: Vec<InstanceRaw>,
     instances_buffer: wgpu::Buffer,
     depth_texture: texture::Texture,
     render_pipeline: wgpu::RenderPipeline,
@@ -123,12 +123,12 @@ impl<'a> State<'a> {
             label: Some("camera_bind_group"),
         });
 
-        let instances = vec![];
-        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        let instances = [];
+        let instances_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
 
         let instances_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&instance_data),
+            contents: bytemuck::cast_slice(&instances_data),
             usage: wgpu::BufferUsages::VERTEX,
         });
 
@@ -150,7 +150,7 @@ impl<'a> State<'a> {
             camera_buffer,
             camera_bind_group,
             bridge,
-            instances,
+            instances_data,
             instances_buffer,
             depth_texture,
             render_pipeline,
@@ -188,20 +188,17 @@ impl<'a> State<'a> {
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
         if let Some(objects) = self.bridge.try_get_objects_mut() {
-            self.instances = objects
-                .iter()
-                .map(|o| Instance::new(o.position, glam::Quat::IDENTITY))
-                .collect();
-            let instance_data = self
-                .instances
-                .iter()
-                .map(Instance::to_raw)
-                .collect::<Vec<_>>();
+            self.instances_data.clear();
+            for o in objects.iter() {
+                self.instances_data
+                    .push(Instance::new_raw(o.position, glam::Quat::IDENTITY));
+            }
+
             self.instances_buffer =
                 self.device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: Some("Instance Buffer"),
-                        contents: bytemuck::cast_slice(&instance_data),
+                        contents: bytemuck::cast_slice(&self.instances_data),
                         usage: wgpu::BufferUsages::VERTEX,
                     });
         }
@@ -255,8 +252,7 @@ impl<'a> State<'a> {
             render_pass.set_pipeline(&self.render_pipeline); // 2.
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.instances_buffer.slice(..));
-            render_pass.draw(0..3, 0..self.instances.len() as _);
-            // render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
+            render_pass.draw(0..3, 0..self.instances_data.len() as u32);
         }
 
         self.queue.submit(iter::once(encoder.finish()));
