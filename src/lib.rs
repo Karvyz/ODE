@@ -4,6 +4,7 @@ mod camera_controller;
 mod instance;
 pub mod object;
 mod state;
+mod texture;
 
 use bridge::Bridge;
 use state::State;
