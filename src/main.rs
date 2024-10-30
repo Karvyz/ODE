@@ -16,9 +16,13 @@ fn main() {
         }
     }
     loop {
-        sleep(Duration::from_secs(1));
+        sleep(Duration::from_millis(10));
         if bridge.window_killed() {
             break;
+        }
+
+        if bridge.get_sync() {
+            println!("sync");
         }
     }
 }

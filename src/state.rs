@@ -205,6 +205,7 @@ impl<'a> State<'a> {
 
         self.nb_frames += 1;
         if self.prev_sec.elapsed().as_secs() >= 1 {
+            self.bridge.set_sync();
             println!("FPS: {}", self.nb_frames);
             self.nb_frames = 0;
             self.prev_sec = Instant::now();
