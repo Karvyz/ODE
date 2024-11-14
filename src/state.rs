@@ -1,3 +1,4 @@
+use glam::{Mat4, Quat, Vec3};
 use std::{iter, time::Instant};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
@@ -179,6 +180,21 @@ impl<'a> State<'a> {
         }
     }
 
+    fn look_at(from: Vec3, to: Vec3, up: Vec3) -> Quat {
+        // Calculate the forward vector from the object to the target
+        let forward = (to - from).normalize();
+
+        // Calculate the right and corrected up vectors using cross products
+        let right = up.cross(forward).normalize();
+        let up_corrected = forward.cross(right);
+
+        // Construct a rotation matrix from the right, up, and forward vectors
+        let rotation_matrix = glam::Mat3::from_cols(right, up_corrected, forward);
+
+        // Convert the rotation matrix to a quaternion
+        Quat::from_mat3(&rotation_matrix)
+    }
+
     pub fn update(&mut self) {
         self.camera_controller.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
@@ -190,8 +206,9 @@ impl<'a> State<'a> {
         if let Some(objects) = self.bridge.try_get_objects_mut() {
             self.instances_data.clear();
             for o in objects.iter() {
+                let quat = State::look_at(o.position, self.camera.eye, Vec3::Y);
                 self.instances_data
-                    .push(Instance::new_raw(o.position, glam::Quat::IDENTITY));
+                    .push(Instance::new_raw(o.position, quat));
             }
 
             self.instances_buffer =

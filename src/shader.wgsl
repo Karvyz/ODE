@@ -50,8 +50,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 		if distance > 1.0 {
 				discard;
 		}
-		if distance > 0.9 {
-				return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-		}
+		// if distance > 0.9 {
+		// 		return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+		// }
     return vec4<f32>(1.0);
 }
